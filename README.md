@@ -1,23 +1,5 @@
 StackServer instructions:
 
-Tests 
-
-- [x] test_pops_to_empty_stack
-- [x] test_one_slow_client_gets_killed_for_fast_clients (response code contradicting with test_server_resource_limit)
-- [x] The test suite will cleanly close all of its connections when the teardown # runs after each test. Your code will need to account for, and cleanup closed# connections. To do this in a POSIX world, you must attempt to read from the # socket; if your read call returns 0, then the connection has been closed. # See the man page on recv: - implemented server reload for this.
-- [x] test_full_stack_ignore
-- [x] test_slowest_client_gets_killed 
-- [x] test_slow_client_gets_killed_for_fast_client 
-- [x] test_server_resource_limit (0xFF)
-- [x] test_long_polling_push
-- [x] test_server_queues_slow_message_correctly 
-- [x] test_server_survives_half_message 
-- [x] test_long_polling_get
-- [x] test_serialized_requests
-- [x] test_interleaved_requests
-- [x] test_single_request
-- [x] test_slow_clients_are_not_disconnected_for_no_reason
-
 Technologies used: GoLang, Docker
 
 To start server just go the root and type “make takeoff”, if it doesn't work, ensure make tool is installed.
