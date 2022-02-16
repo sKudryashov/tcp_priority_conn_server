@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/labstack/gommon/log"
-	"github.com/pkg/profile"
+
 	"github.com/sKudryashov/stacksrv/internal/conn"
 	connPkg "github.com/sKudryashov/stacksrv/internal/conn"
 	"github.com/sKudryashov/stacksrv/internal/handler"
@@ -16,7 +16,7 @@ import (
 
 func main() {
 	// go turnOnProf()
-	defer profile.Start(profile.MemProfile, profile.ProfilePath(".")).Stop()
+	// defer profile.Start(profile.MemProfile, profile.ProfilePath(".")).Stop()
 	var addr, addrCtrl string
 	flag.StringVar(&addr, "service", ":8080", "service address endpoint")
 	flag.StringVar(&addrCtrl, "control", ":8081", "service address endpoint")
