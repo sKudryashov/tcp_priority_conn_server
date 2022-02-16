@@ -200,18 +200,12 @@ class StackTest < Test::Unit::TestCase
   # issues one push and one pop
   #
   def test_single_request
-    # push_reload()
     puts "test_single_request"
     s = random_string
-    puts "random string #{s}"
     pr = push(s)
-    puts "push response #{pr}"
     assert_equal(0, pr, "expected 0, got #{pr}")
-    puts "pop request"
     r = pop()
-    puts "pop response #{r}"
     assert_equal(s, r, "expected #{s}, got #{r}")
-    
   end
 
   #
@@ -219,7 +213,6 @@ class StackTest < Test::Unit::TestCase
   #
   def test_serialized_requests
     puts "test_serialized_requests"
-    push_reload()
     30.times do
       ntimes = rand(10)
       expects = []
@@ -246,16 +239,13 @@ class StackTest < Test::Unit::TestCase
       expects = []
       100.times do
         expects << random_string
-        exx = expects[-1]
-        pr = push(exx)
-        puts "100 times push #{exx}"
+        pr = push(expects[-1])
         assert_equal(0, pr, "expected 0, got #{pr}")
       end
 
       100.times do
         r = pop
         s = expects.pop
-        puts "100 times pop got #{s} expects #{r}"
         assert_equal(s, r, "expected #{s}, got #{r}")
       end
     end
@@ -274,7 +264,6 @@ class StackTest < Test::Unit::TestCase
   #
   def test_interleaved_requests
     puts "test_interleaved_requests"
-    push_reload()
     30.times do
       mutex = Mutex.new
       ntimes = rand(50)
@@ -290,7 +279,6 @@ class StackTest < Test::Unit::TestCase
           mutex.synchronize do
             r = pop
             s = stack.pop
-            puts "r = #{r} s = #{s}"
           end
           assert_equal(s, r, "expected #{s}, got #{r}")
           sleep(rand(3) / 100.0) if rand(2).zero?
@@ -318,7 +306,6 @@ class StackTest < Test::Unit::TestCase
   #
   def test_long_polling_get
     puts "test_long_polling_get"
-    push_reload()
     s = random_string
     t = Thread.new do
       r = pop
@@ -338,11 +325,9 @@ class StackTest < Test::Unit::TestCase
   #
   def test_long_polling_push
     puts "test_long_polling_push"
-    push_reload()
     s1 = nil
     100.times do
       s1 = random_string
-      puts "random string 100 push #{s1}"
       pr = push(s1)
       assert_equal(0, pr, "expected 0, got #{pr}")
     end
@@ -350,30 +335,22 @@ class StackTest < Test::Unit::TestCase
     # start the long polling push
     s2 = random_string
     t = Thread.new do
-      puts "long polling random string push #{s2}"
       pr = push(s2)
-      puts "long after push #{s2}"
       assert_equal(0, pr, "expected 0, got #{pr}")
-      puts "long polling random string push after "
     end
     sleep 2
 
     r1 = pop
-    puts "r1 pop after sleep #{r1}"
     assert_equal(s1, r1, "expected #{s1}, got #{r1}")
 
     # now the long polling push should succeed
-    puts "getting the longpolling push"
     r2 = pop
-    puts "after pop"
     assert_equal(s2, r2, "expected #{s2}, got #{r2}")
-    puts "after assert #{t}"
     t.join
-    puts "after join before 99 pop"
+
     99.times do
       pop
     end
-    puts "after 99 pop"
   end
 
   #
@@ -382,7 +359,6 @@ class StackTest < Test::Unit::TestCase
   # succeed.
   #
   def test_pops_to_empty_stack
-    push_reload()
     puts "test_pops_to_empty_stack"
     threads = []
     100.times do
@@ -392,33 +368,17 @@ class StackTest < Test::Unit::TestCase
       end
     end
     threads.each {|t| t.join}
-    puts "test_single_request"
+
     test_single_request
   end
 
-  #Ensures the server works correctly after each reload
-  def test_multiple_reload
-    push_reload()
-    test_single_request
-    push_reload()
-    test_single_request
-    push_reload()
-    test_single_request
-  end 
   #
   # fills up the stack; then issues another push, which should block (because
   # the stack is full), it will time out, then the 100 pops should obtain the
   # objects on the full stack.
   #
-  # NOTE Contradicts to test_long_polling_push, where the connection waits in the queue until 
-  # there is a free space in stack, once it is, 
-  # it's getting immediately pushed to the stack and popped back.
-  # so "too full" is getting recorded to the stack and than immediately pops out 
-  # (to preserve the order, required in test_long_polling_push)"
-  
   def test_full_stack_ignore
     puts "test_full_stack_ignore"
-    push_reload()
     expects = []
     100.times do
       expects << random_string
@@ -436,7 +396,6 @@ class StackTest < Test::Unit::TestCase
       s = expects.pop
       assert_equal(s, r, "expected #{s}, got #{r}")
     end
-    
   end
 
   #
@@ -444,7 +403,6 @@ class StackTest < Test::Unit::TestCase
   #
   def test_server_resource_limit
     puts "test_server_resource_limit"
-    push_reload()
     start_slow_clients(nclients: 100)
     sleep 5
 
@@ -460,10 +418,8 @@ class StackTest < Test::Unit::TestCase
   #
   def test_slow_client_gets_killed_for_fast_client
     puts "test_slow_clients_get_killed_for_fast_client"
-    push_reload()
     start_slow_clients(nclients: 100)
     sleep 12
-    puts "after sleep test_single_request"
     test_single_request
   end
 
@@ -473,11 +429,8 @@ class StackTest < Test::Unit::TestCase
   #
   def test_one_slow_client_gets_killed_for_fast_clients
     puts "test_one_slow_client_gets_killed_for_fast_clients"
-    push_reload()
     start_slow_clients(nclients: 100)
-    puts "start_slow_clients "
     sleep 12
-    puts "end_slow_clients "
     test_full_stack_push_and_pop
   end
 
@@ -486,7 +439,6 @@ class StackTest < Test::Unit::TestCase
   #
   def test_slowest_client_gets_killed
     puts "test_slowest_client_gets_killed"
-    # push_reload()
     # start slow client
     r = nil
     t = Thread.new do
@@ -509,13 +461,10 @@ class StackTest < Test::Unit::TestCase
 
     # don't care about the order, but do care about all strings being there
     99.times do
-    # 4.times do
       r = pop
-      puts "pop content #{r}"
       assert(expects.include?(r), "expected #{r} to exist in expects[]")
       expects.delete(r)
     end
-    # push_reload()
   end
 
   #
@@ -525,7 +474,7 @@ class StackTest < Test::Unit::TestCase
   #
   def test_server_survives_half_message
     puts "test_server_survives_half_message"
-    push_reload()
+
     expects = []
     10.times do
       expects << random_string
@@ -562,7 +511,7 @@ class StackTest < Test::Unit::TestCase
   #
   def test_server_queues_slow_message_correctly
     puts "test_server_queues_slow_message_correctly"
-    push_reload()
+
     expects = []
     10.times do
       expects << random_string
@@ -572,8 +521,6 @@ class StackTest < Test::Unit::TestCase
 
     # send 1 byte of slow string
     slow_s = random_string(2)
-    # slow_s = "zolooos"
-    puts "slow_s.length #{slow_s.length} string slow_s #{slow_s}" 
     header = slow_s.length
     client = tcp_socket()
     nbytes = client.send([header].pack("C1"), 0)
@@ -603,7 +550,6 @@ class StackTest < Test::Unit::TestCase
 
   def test_slow_clients_are_not_disconnected_for_no_reason
     puts "test_slow_clients_are_not_disconnected_for_no_reason"
-    push_reload()
     expects = []
     100.times do
       expects << random_string
@@ -625,10 +571,6 @@ protected
     Base64.encode64(Random.new.bytes(length)).strip[0..(length-1)]
   end
 
-  def tcp_control_socket
-    Thread.current[:socket] = TCPSocket.new("localhost", 8081)
-  end 
-
   def tcp_socket
     Thread.current[:socket] = TCPSocket.new("localhost", 8080)
   end
@@ -643,13 +585,6 @@ protected
   #
   # an optional block passed to push() is invoked after each send()
   #
-  def push_reload
-    client = tcp_control_socket()
-    puts "reload signal to she server"
-    client.send("rel", 0)
-    sleep 5
-  end
-
   def push(s, args = {})
     client = nil
     _push = proc do
@@ -684,7 +619,7 @@ protected
       rescue Errno::EPIPE, Errno::ECONNRESET
         #server might have been busy and closed the connection
       end
-      # puts "puts response #{r}"
+
       # maybe nil if the connection was killed
       if ![0xFF, 0, nil].include?(r)
         raise "invalid push response #{r.inspect}"
@@ -713,7 +648,7 @@ protected
 
   def pop(args = {})
     client = tcp_socket()
-    # puts("pop called")
+
     _pop = proc do
       begin
         client.send([0x80].pack("C1"), 0)
@@ -758,6 +693,7 @@ protected
     else
       r = _pop.call
     end
+
     return r
   ensure
     if !client.nil?
@@ -774,7 +710,6 @@ protected
         added_count = false
         s = random_string(string_size)
         expects << s
-        puts "slow client string #{s}"
         pr = push(s, :maxsend => 1, :sleep => 1) do
           if !added_count
             mutex.synchronize { count += 1 }
