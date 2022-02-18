@@ -13,16 +13,9 @@ If there is too much logging - you may reduce logging level change LOG_LEVEL: de
 
 Also some unit tests are available, they are in *_test.go files. 
 
-Both stack-test.rb and stack-test-original.rb are included in the root. Original version was not changed,
-stack-test.rb contains some debugging outpus and server relaunch commands.
 
-Known issues:
-note#1 The tests test_pops_to_empty_stack and test_server_resource_limit seems to be contradicting each other. If 
-1. comment the code which begins from note#1 and ends EOF note#1 - the test_server_resource_limit will be working
-2. uncomment the which begins from note#1 and ends EOF note#1 in test_pops_to_empty_stack works test_server_resource_limit doesn’t, although the code 0xFF is sent to the client.
-
-### TASK
-Write a server that manages a LIFO stack, supporting push and pop
+### Socket Server Description
+A server that manages a LIFO stack, supporting push and pop
 operations. The server listens for requests from clients connecting over TCP
 on port 8080. The server should respond to the request and then close the
 connection.
