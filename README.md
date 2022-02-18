@@ -1,6 +1,6 @@
-StackServer instructions:
+### StackServer instructions:
 
-Technologies used: GoLang, Docker
+#### Technologies used: GoLang, Docker
 
 To start server just go the root and type “make takeoff”, if it doesn't work, ensure make tool is installed.
 To restart it - push on port 8081 “rel” command to the socket, in stack-test.rb it is “push_reload” action. Each test prepended with push_reload call to reset it’s state (as mentioned in the spec) except for test_single_request because it is used in different tests and may reset the connection in the middle. 
