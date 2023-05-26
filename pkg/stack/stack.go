@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/labstack/gommon/log"
+	"github.com/sKudryashov/stacksrv/pkg/logger"
 )
 
 const (
@@ -33,18 +33,16 @@ type WaitConnAPI interface {
 }
 
 // NewStack represents a stack constructor
-func NewStack(lgr *log.Logger, writeWait chan WaitConnAPI) *Stack {
+func NewStack(writeWait chan WaitConnAPI) *Stack {
 	return &Stack{
 		// readWait:  readWait,
 		writeWait: writeWait,
-		lgr:       lgr,
 		data:      make([]interface{}, 0, StackLength),
 	}
 }
 
 // Stack represents data type stack
 type Stack struct {
-	lgr       *log.Logger
 	wrLock    bool
 	mu        sync.RWMutex
 	data      []interface{}
@@ -58,19 +56,19 @@ func (s *Stack) Push(i interface{}) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	ln := len(s.data)
-	s.lgr.Infof("the stack length %d ", ln)
+	logger.App.Infof("the stack length %d ", ln)
 	if ln < StackLength {
 		s.data = append(s.data, i)
-		s.lgr.Infof("the stack isn't full %d", ln)
+		logger.App.Infof("the stack isn't full %d", ln)
 		return true
 	}
-	s.lgr.Infof("the stack full %d", ln)
+	logger.App.Infof("the stack full %d", ln)
 	dataByte := s.data[len(s.data)-1].([]byte)
-	s.lgr.Infof("the stack full %d last record is %s", ln, string(dataByte))
+	logger.App.Infof("the stack full %d last record is %s", ln, string(dataByte))
 	return false
 }
 
-//PushLock pushes data with lock
+// PushLock pushes data with lock
 func (s *Stack) PushLock(i interface{}) bool {
 	s.wrLock = false
 	return s.Push(i)
@@ -123,7 +121,7 @@ func (s *Stack) Pop() (interface{}, bool) {
 		// if it is active, then it will be processed, if not, swept by the pool collector
 		if dataQ.CheckIsActive() {
 			data := dataQ.GetData()
-			s.lgr.Infof(" waiting push writes data to the stack %s ", string(data))
+			logger.App.Infof(" waiting push writes data to the stack %s ", string(data))
 			s.data = append(s.data, data)
 			dataQ.WritePushResponse()
 		}
@@ -132,7 +130,7 @@ func (s *Stack) Pop() (interface{}, bool) {
 	return data, true
 }
 
-//Len shows the lenghth of the stack
+// Len shows the lenghth of the stack
 func (s *Stack) Len() int {
 	s.mu.RLock()
 	ln := len(s.data)
@@ -140,7 +138,7 @@ func (s *Stack) Len() int {
 	return ln
 }
 
-//IsEmpty returns if the stack is empty
+// IsEmpty returns if the stack is empty
 func (s *Stack) IsEmpty() bool {
 	s.mu.RLock()
 	ln := len(s.data)

@@ -1,4 +1,4 @@
-### StackServer instructions:
+### TCP priority server:
 
 #### Technologies used: GoLang, Docker
 

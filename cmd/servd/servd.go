@@ -12,6 +12,7 @@ import (
 	"github.com/sKudryashov/stacksrv/internal/conn"
 	connPkg "github.com/sKudryashov/stacksrv/internal/conn"
 	"github.com/sKudryashov/stacksrv/internal/handler"
+	"github.com/sKudryashov/stacksrv/pkg/logger"
 )
 
 func main() {
@@ -24,11 +25,9 @@ func main() {
 	stopCh := make(chan interface{}, 5)
 	stoppedCh := make(chan interface{})
 	restartCh := make(chan interface{})
-	lgr := log.New("server")
-	lgr.SetHeader(`"level":"${level}","time":"${time_rfc3339_nano}","name":"${prefix}","location":"${short_file}:${line}"}`)
-	lgr.SetLevel(getLogLVL())
+
 	var srv *Server
-	srv = NewServer(addr, lgr)
+	srv = NewServer(addr)
 
 	go startControl(addrCtrl, restartCh)
 	go srv.start(stopCh, stoppedCh)
@@ -36,53 +35,54 @@ func main() {
 	for {
 		select {
 		case <-restartCh:
-			srv.lgr.Info("server restart signal received")
+			logger.App.Info("server restart signal received")
 			stopCh <- struct{}{}
-			srv.lgr.Info("issued stop signal for the server")
+			logger.App.Info("issued stop signal for the server")
 			srv.lstnr.Close()
 			select {
 			case <-stoppedCh:
-				srv.lgr.Info("signal server stopped received, ready to restart .. ")
-				srv = NewServer(addr, lgr)
-				srv.lgr.Debug("new srv instance created")
+				logger.App.Info("signal server stopped received, ready to restart .. ")
+				srv = NewServer(addr)
+				logger.App.Debug("new srv instance created")
 				go srv.start(stopCh, stoppedCh)
 			}
 		}
 	}
 }
 
-//Start with start you may either start or restart the server
+// Start with start you may either start or restart the server
 func (srv *Server) start(stopCh <-chan interface{}, stoppedCh chan<- interface{}) {
 	readingQueue := make(chan *conn.Conn, conn.MaxConn)
 	stopWorkersCh := make(chan interface{})
-	pool := conn.NewConnPool(srv.lgr, stopWorkersCh)
-	tcpHandler := handler.NewTCP(srv.lgr, pool)
-	srv.lgr.Infof("server started on address %s", srv.laddr)
+	pool := conn.NewConnPool(stopWorkersCh)
+	tcpHandler := handler.NewTCP(pool)
+	logger.App.Infof("server started on address %s", srv.laddr)
+
 	go tcpHandler.ConnListener(readingQueue, stopWorkersCh)
 	for {
 		select {
 		case <-stopCh:
 			srv.lstnr.Close()
-			srv.lgr.Info("server stop signal received")
+			logger.App.Info("server stop signal received")
 			close(stopWorkersCh)
 			readingQueue = nil
-			srv.lgr.Info("closing listeners.. ")
+			logger.App.Info("closing listeners.. ")
 			//let every worker get its signals
 			time.Sleep(1 * time.Second)
 			stoppedCh <- struct{}{}
-			srv.lgr.Info("server is stopped")
+			logger.App.Info("server is stopped")
 			return
 		default:
 		}
 		conn, err := srv.lstnr.AcceptTCP()
 		if err != nil {
-			srv.lgr.Errorf("failed to accept conn: %", err)
+			logger.App.Errorf("failed to accept conn: %", err)
 			if conn != nil {
 				conn.Close()
 			}
 			continue
 		}
-		srv.lgr.Infof("accepted tcp from ", conn.RemoteAddr())
+		logger.App.Infof("accepted tcp from ", conn.RemoteAddr())
 		appConn := &connPkg.Conn{
 			TCPConn: conn,
 		}
@@ -106,7 +106,7 @@ func (srv *Server) stop() {
 }
 
 // NewServer is a server constructor
-func NewServer(addr string, lgr *log.Logger) *Server {
+func NewServer(addr string) *Server {
 	resolvedTCPAddr, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
 		fmt.Println("resolvedTCPAddr error ", err.Error())
@@ -121,7 +121,6 @@ func NewServer(addr string, lgr *log.Logger) *Server {
 	return &Server{
 		lstnr:   listener,
 		tcpAddr: resolvedTCPAddr,
-		lgr:     lgr,
 		laddr:   addr,
 	}
 }
@@ -129,18 +128,15 @@ func NewServer(addr string, lgr *log.Logger) *Server {
 func startControl(addrCtrl string, restartCh chan<- interface{}) {
 	laddr, err := net.ResolveTCPAddr("tcp", addrCtrl)
 	l, err := net.ListenTCP("tcp", laddr)
-	lgr := log.New("control")
-	lgr.SetHeader(`"level":"${level}","name":"${prefix}","location":"${short_file}:${line}"}`)
-	lgr.SetLevel(getLogLVL())
 	if err != nil {
 		fmt.Println("launch error ", err.Error())
 		os.Exit(1)
 	}
 	for {
-		lgr.Infof("ready to accept control commands on addr %s", addrCtrl)
+		logger.Control.Infof("ready to accept control commands on addr %s", addrCtrl)
 		conn, err := l.AcceptTCP()
 		if err != nil {
-			lgr.Errorf("failed to accept conn: %", err)
+			logger.Control.Errorf("failed to accept conn: %", err)
 			conn.Close()
 			continue
 		}
@@ -148,10 +144,10 @@ func startControl(addrCtrl string, restartCh chan<- interface{}) {
 		conn.SetKeepAlive(false)
 		data := make([]byte, 3)
 		if _, err := conn.Read(data); err != nil {
-			lgr.Errorf("unable to read conn %v", err)
+			logger.Control.Errorf("unable to read conn %v", err)
 		}
 		conn.Close()
-		lgr.Infof("accepted tcp from ", conn.RemoteAddr())
+		logger.Control.Infof("accepted tcp from ", conn.RemoteAddr())
 		if string(data) == "rel" {
 			restartCh <- struct{}{}
 		}
@@ -161,7 +157,6 @@ func startControl(addrCtrl string, restartCh chan<- interface{}) {
 type Server struct {
 	lstnr   *net.TCPListener
 	tcpAddr *net.TCPAddr
-	lgr     *log.Logger
 	laddr   string
 }
 

@@ -5,14 +5,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/labstack/gommon/log"
+	"github.com/sKudryashov/stacksrv/pkg/logger"
 )
 
-//NewConnPool a ConnPool constructor
-func NewConnPool(lgr *log.Logger, doneCh <-chan interface{}) *ConnPool {
+// NewConnPool a ConnPool constructor
+func NewConnPool(doneCh <-chan interface{}) *ConnPool {
 	cp := &ConnPool{
 		doneCh:   doneCh,
-		lgr:      lgr,
 		connList: list.New(),
 		list:     make([]*Conn, 0, MaxConn),
 	}
@@ -20,9 +19,8 @@ func NewConnPool(lgr *log.Logger, doneCh <-chan interface{}) *ConnPool {
 	return cp
 }
 
-//ConnPool represents a connection pool
+// ConnPool represents a connection pool
 type ConnPool struct {
-	lgr      *log.Logger
 	mu       sync.RWMutex
 	connList *list.List
 	doneCh   <-chan interface{}
@@ -32,25 +30,25 @@ type ConnPool struct {
 func (c *ConnPool) isConnOutdated(cc *Conn) bool {
 	now := time.Now().Unix()
 	diff := (now - cc.time)
-	c.lgr.Debugf("diff >= ConnExpiration diff %d now %d and conn time %d conn id %d", diff, now, cc.time, cc.GetID())
+	logger.App.Debugf("diff >= ConnExpiration diff %d now %d and conn time %d conn id %d", diff, now, cc.time, cc.GetID())
 	if diff >= ConnExpiration {
-		c.lgr.Debugf("conn expired ", diff, now, cc.time, cc.GetID())
+		logger.App.Debugf("conn expired ", diff, now, cc.time, cc.GetID())
 		return true
 	}
 	return false
 }
 
-//TryPush tries to push the conn
+// TryPush tries to push the conn
 func (c *ConnPool) TryPush(cc *Conn, readingQueue chan<- *Conn) {
 	connEv, ok := c.PushS(cc, readingQueue)
 	if ok && connEv != nil {
 		// evicted connection, mark as inactive (to treat appropriately in waiting queues) and close
 		connEv.SetActive(false)
-		c.lgr.Infof("conn evicted %d", cc.GetID())
+		logger.App.Infof("conn evicted %d", cc.GetID())
 		connEv.Close()
 	} else if !ok {
 		//busy, nothing to evict
-		c.lgr.Infof("pool busy %d", cc.GetID())
+		logger.App.Infof("pool busy %d", cc.GetID())
 		cc.Write([]byte{0xFF}) // note#1 uncommented for test - test_server_resource_limit commented for test_pops_to_empty_stack
 		cc.Close()
 	}
@@ -64,13 +62,13 @@ func (c *ConnPool) PushS(cc *Conn, readingQueue chan<- *Conn) (*Conn, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	ln := len(c.list)
-	c.lgr.Debugf("connection pull length: %d", ln)
-	c.lgr.Debugf("max conn : %d", MaxConn)
+	logger.App.Debugf("connection pull length: %d", ln)
+	logger.App.Debugf("max conn : %d", MaxConn)
 	if ln < MaxConn {
 		cc.SetID(ln)
 		c.list = append(c.list, cc)
 		// callback call reading socket here
-		c.lgr.Debugf("pushed conn ReadingQueue %d ", cc.GetID())
+		logger.App.Debugf("pushed conn ReadingQueue %d ", cc.GetID())
 		select {
 		case readingQueue <- cc:
 			return nil, true
@@ -79,14 +77,13 @@ func (c *ConnPool) PushS(cc *Conn, readingQueue chan<- *Conn) (*Conn, bool) {
 	first := c.list[0]
 	// evict outdated connection
 	if c.isConnOutdated(first) {
-		c.lgr.Debug("note#1 conn outdated and will be evicted ")
+		logger.App.Debug("note#1 conn outdated and will be evicted ")
 		c.list = c.list[1:]
 		c.list = append(c.list, cc)
 		readingQueue <- cc
 		return first, true
 	}
 	// evict inactive connection
-	// note#1 doesn't work with test_server_resource_limit but makes work test_pops_to_empty_stack,
 	// if commented, test_server_resource_limit works.
 	// if !first.CheckIsActive() {
 	// 	c.list = c.list[1:]
@@ -94,15 +91,14 @@ func (c *ConnPool) PushS(cc *Conn, readingQueue chan<- *Conn) (*Conn, bool) {
 	// 	readingQueue <- cc
 	// 	return first, true
 	// }
-	// EOF note#1
-	c.lgr.Debug("note#1 no more connections can be added to the pool, no evicted either 0xFF code")
+	logger.App.Debug("note#1 no more connections can be added to the pool, no evicted either 0xFF code")
 	// no more connections can be added to the pool, no evicted either
 	return nil, false
 }
 
 func (c *ConnPool) checkIsActive(conn *Conn) bool {
 	if !conn.IsActive() {
-		c.lgr.Debugf("conn %d is inactive", conn.GetID())
+		logger.App.Debugf("conn %d is inactive", conn.GetID())
 		return false
 	}
 
@@ -120,7 +116,7 @@ func (c *ConnPool) connSupervisor() {
 			}
 			c.list = c.list[:0]
 			c.mu.Unlock()
-			c.lgr.Info("conn pool supervisor stopped")
+			logger.App.Info("conn pool supervisor stopped")
 			return
 		default:
 			time.Sleep(connCollectorInterval)
@@ -138,7 +134,7 @@ func (c *ConnPool) freeInactive() {
 			c.releaseConnByID(i)
 			// avoiding double lock
 			connInPool.CloseL()
-			c.lgr.Debugf("conn %d swept by the pool collector", connInPool.GetID())
+			logger.App.Debugf("conn %d swept by the pool collector", connInPool.GetID())
 		}
 	}
 	c.mu.Unlock()
@@ -171,7 +167,7 @@ func (c *ConnPool) releaseConnByID(i int) {
 func (c *ConnPool) Free(conn *Conn) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.lgr.Debugf("free conn id called %d", conn.GetID())
+	logger.App.Debugf("free conn id called %d", conn.GetID())
 	for i, connInPool := range c.list {
 		if conn.GetID() == connInPool.GetID() {
 			// i is a single element
